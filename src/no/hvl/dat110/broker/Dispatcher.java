@@ -1,6 +1,8 @@
 package no.hvl.dat110.broker;
 
 import java.util.Set;
+import java.util.stream.Collector;
+import java.util.stream.Collectors;
 import java.util.Collection;
 
 import no.hvl.dat110.common.TODO;
@@ -93,7 +95,7 @@ public class Dispatcher extends Stopable {
 
 	}
 
-	// called by dispatch upon receiving a disconnect message 
+	// called by dispatch upon receiving a disconnect message
 	public void onDisconnect(DisconnectMsg msg) {
 
 		String user = msg.getUser();
@@ -108,9 +110,10 @@ public class Dispatcher extends Stopable {
 
 		Logger.log("onCreateTopic:" + msg.toString());
 
-		// TODO: create the topic in the broker storage 
-		
-		throw new UnsupportedOperationException(TODO.method());
+		// TODO: create the topic in the broker storage
+		storage.createTopic(msg.getTopic());
+
+//		throw new UnsupportedOperationException(TODO.method());
 
 	}
 
@@ -119,8 +122,8 @@ public class Dispatcher extends Stopable {
 		Logger.log("onDeleteTopic:" + msg.toString());
 
 		// TODO: delete the topic from the broker storage
-		
-		throw new UnsupportedOperationException(TODO.method());
+		storage.deleteTopic(msg.getTopic());
+//		throw new UnsupportedOperationException(TODO.method());
 	}
 
 	public void onSubscribe(SubscribeMsg msg) {
@@ -128,9 +131,9 @@ public class Dispatcher extends Stopable {
 		Logger.log("onSubscribe:" + msg.toString());
 
 		// TODO: subscribe user to the topic
-		
-		throw new UnsupportedOperationException(TODO.method());
-		
+		storage.addSubscriber(msg.getUser(), msg.getTopic());
+//		throw new UnsupportedOperationException(TODO.method());
+
 	}
 
 	public void onUnsubscribe(UnsubscribeMsg msg) {
@@ -138,8 +141,8 @@ public class Dispatcher extends Stopable {
 		Logger.log("onUnsubscribe:" + msg.toString());
 
 		// TODO: unsubscribe user to the topic
-		
-		throw new UnsupportedOperationException(TODO.method());
+		storage.removeSubscriber(msg.getUser(), msg.getTopic());
+//		throw new UnsupportedOperationException(TODO.method());
 	}
 
 	public void onPublish(PublishMsg msg) {
@@ -147,8 +150,14 @@ public class Dispatcher extends Stopable {
 		Logger.log("onPublish:" + msg.toString());
 
 		// TODO: publish the message to clients subscribed to the topic
-		
-		throw new UnsupportedOperationException(TODO.method());
-		
+		Set<String> subscribers = storage.getSubscribers(msg.getTopic());
+		Collection<ClientSession> clients = storage.getSessions();
+		for (ClientSession cs : clients) {
+			if (subscribers.contains(cs.getUser())) {
+				cs.send(msg);
+			}
+		}
+//		throw new UnsupportedOperationException(TODO.method());
+
 	}
 }
