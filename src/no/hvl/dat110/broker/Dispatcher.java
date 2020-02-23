@@ -1,14 +1,21 @@
 package no.hvl.dat110.broker;
 
-import java.util.Set;
-import java.util.stream.Collector;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Set;
 
-import no.hvl.dat110.common.TODO;
 import no.hvl.dat110.common.Logger;
 import no.hvl.dat110.common.Stopable;
-import no.hvl.dat110.messages.*;
+import no.hvl.dat110.messages.ConnectMsg;
+import no.hvl.dat110.messages.CreateTopicMsg;
+import no.hvl.dat110.messages.DeleteTopicMsg;
+import no.hvl.dat110.messages.DisconnectMsg;
+import no.hvl.dat110.messages.Message;
+import no.hvl.dat110.messages.MessageType;
+import no.hvl.dat110.messages.MessageUtils;
+import no.hvl.dat110.messages.PublishMsg;
+import no.hvl.dat110.messages.SubscribeMsg;
+import no.hvl.dat110.messages.UnsubscribeMsg;
 import no.hvl.dat110.messagetransport.Connection;
 
 public class Dispatcher extends Stopable {
@@ -91,7 +98,17 @@ public class Dispatcher extends Stopable {
 
 		Logger.log("onConnect:" + msg.toString());
 
-		storage.addClientSession(user, connection);
+		if (storage.getMessageBuffer(user) == null) {
+			storage.addClientSession(user, connection);
+		} else {
+			storage.reconnectUser(user, connection);
+			ArrayList<Message> offlineMsgs = storage.getMessageBuffer(user);
+
+			for (Message msgs : offlineMsgs) {
+				MessageUtils.send(connection, msgs);
+			}
+			storage.emptyMessageBuffer(user);
+		}
 
 	}
 
@@ -101,8 +118,10 @@ public class Dispatcher extends Stopable {
 		String user = msg.getUser();
 
 		Logger.log("onDisconnect:" + msg.toString());
-
+		
+		storage.disconnectUser(user);
 		storage.removeClientSession(user);
+		
 
 	}
 
@@ -151,12 +170,15 @@ public class Dispatcher extends Stopable {
 
 		// TODO: publish the message to clients subscribed to the topic
 		Set<String> subscribers = storage.getSubscribers(msg.getTopic());
-		Collection<ClientSession> clients = storage.getSessions();
-		for (ClientSession cs : clients) {
-			if (subscribers.contains(cs.getUser())) {
-				cs.send(msg);
+		for (String user : subscribers) {
+			if (storage.isConnected(user) && storage.getSession(user) != null) {
+				storage.getSession(user).send(msg);
+			} else {
+				storage.addToMessageBuffer(user, msg);
+
 			}
 		}
+		
 //		throw new UnsupportedOperationException(TODO.method());
 
 	}
